@@ -41,9 +41,15 @@ pipeline {
                     if (isUnix()) {
                         sh '''
                             set -eu
+
+                                                        host=127.0.0.1
+                                                        if [ -f /.dockerenv ]; then
+                                                            host=host.docker.internal
+                                                        fi
+
                             deadline=$((SECONDS+30))
                             until [ $SECONDS -ge $deadline ]; do
-                              code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:${PORT}/health || true)
+                                                            code=$(curl -s -o /dev/null -w "%{http_code}" "http://${host}:${PORT}/health" || true)
                               if [ "$code" = "200" ]; then
                                 echo "Service is ready (HTTP 200)"
                                 exit 0
@@ -52,6 +58,7 @@ pipeline {
                               sleep 5
                             done
                             echo "Timed out waiting for readiness"
+                                                        echo "If Jenkins runs in Docker, ensure it can reach the published port. This pipeline uses host=$host"
                             exit 1
                         '''
                     } else {
@@ -95,7 +102,12 @@ pipeline {
                     if (isUnix()) {
                         sh '''
                             set -eu
-                            resp=$(curl -s -X POST http://127.0.0.1:${PORT}/predict \
+                                                        host=127.0.0.1
+                                                        if [ -f /.dockerenv ]; then
+                                                            host=host.docker.internal
+                                                        fi
+
+                                                        resp=$(curl -s -X POST "http://${host}:${PORT}/predict" \
                               -H "Content-Type: application/json" \
                               -d '{"alcohol":10}')
                             echo "Response: $resp"
@@ -127,10 +139,21 @@ pipeline {
                     if (isUnix()) {
                         sh '''
                             set -eu
-                            code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:${PORT}/predict \
+                                                        host=127.0.0.1
+                                                        if [ -f /.dockerenv ]; then
+                                                            host=host.docker.internal
+                                                        fi
+
+                                                        code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://${host}:${PORT}/predict" \
                               -H "Content-Type: application/json" \
                               -d '{"alcohol":"bad"}' || true)
                             echo "Invalid request HTTP status: $code"
+
+                                                        if [ -z "$code" ] || [ "$code" = "000" ]; then
+                                                            echo "No HTTP response from API (host=$host, port=${PORT}). Check container logs and Docker networking."
+                                                            exit 1
+                                                        fi
+
                             if [ "$code" -lt 400 ]; then
                               echo "Expected 4xx/5xx for invalid input"
                               exit 1
