@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'YOUR_DOCKERHUB_USERNAME/wine-quality-api:latest'
+        IMAGE_NAME = 'wine-quality-api:ci'
         PORT = '8000'
         CONTAINER_NAME = "wine-quality-api-${env.BUILD_TAG}".replaceAll('[^a-zA-Z0-9_.-]', '-')
 
@@ -11,9 +11,9 @@ pipeline {
     }
 
     stages {
-        stage('Pull Image') {
+        stage('Build Image') {
             steps {
-                sh 'docker pull $IMAGE_NAME'
+                sh 'docker build -t $IMAGE_NAME .'
             }
         }
 
